@@ -1,0 +1,35 @@
+#include "build-info.h"
+
+#include <cstdio>
+#include <string>
+
+int vDgsBuildNumber = @DGS_BUILD_NUMBER@;
+char const * vDgsCommit = "@DGS_BUILD_COMMIT@";
+char const * vDgsCompiler = "@BUILD_COMPILER@";
+char const * vDgsBuildTarget = "@BUILD_TARGET@";
+
+int fDgsBuildNumber(void) {
+  return vDgsBuildNumber;
+}
+
+const char * fDgsCommit(void) {
+  return vDgsCommit;
+}
+
+const char * fDgsCompiler(void) {
+  return vDgsCompiler;
+}
+
+const char * fDgsBuildTarget(void) {
+  return vDgsBuildTarget;
+}
+
+const char * fDgsBuildInfo(void) {
+  static std::string s = "b" + std::to_string(vDgsBuildNumber) + "-" + vDgsCommit;
+  return s.c_str();
+}
+
+void fDgsPrintBuildInfo(const char * pDgsVersion, FILE * stream) {
+  fprintf(stream, "version: %s (build %d, commit %s)\n", pDgsVersion, fDgsBuildNumber(), fDgsCommit());
+  fprintf(stream, "built with %s for %s\n", fDgsCompiler(), fDgsBuildTarget());
+}

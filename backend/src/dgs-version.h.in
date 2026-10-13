@@ -1,0 +1,4 @@
+#pragma once
+
+#define DGS_VERSION "@DGS_VERSION@"
+#define vDgsCommit  "@DGS_BUILD_COMMIT@"

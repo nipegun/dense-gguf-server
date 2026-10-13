@@ -1,0 +1,5 @@
+set(DGS_CHAT_PARSERS_SOURCES
+  ${CMAKE_CURRENT_LIST_DIR}/parsers.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/parsers.h
+  ${CMAKE_CURRENT_LIST_DIR}/qwen3-coder.cpp
+)

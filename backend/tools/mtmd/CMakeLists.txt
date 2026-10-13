@@ -1,0 +1,101 @@
+# mtmd
+
+set(MTMD_VIDEO_HELP "enable video support in mtmd (requires ffmpeg binary in PATH)")
+
+set(MTMD_VIDEO ON CACHE BOOL "${MTMD_VIDEO_HELP}")
+# TODO: add MTMD_VIDEO_METHOD in the future to select between ffmpeg and other backends
+
+if (MTMD_VIDEO AND NOT DGS_SUBPROCESS)
+  message(STATUS "Disabling MTMD_VIDEO because DGS_SUBPROCESS is OFF")
+  set(MTMD_VIDEO OFF CACHE BOOL "${MTMD_VIDEO_HELP}" FORCE)
+endif()
+
+find_package(Threads REQUIRED)
+
+add_library(mtmd
+      mtmd.cpp
+      mtmd-audio.cpp
+      mtmd-image.cpp
+      mtmd.h
+      mtmd-internal.h
+      mtmd-helper.cpp
+      mtmd-helper-gen.cpp
+      mtmd-helper-common.h
+      mtmd-helper.h
+      clip.cpp
+      clip.h
+      clip-impl.h
+      clip-model.h
+      clip-graph.h
+      models/models.h
+      models/qwen-vision-base.cpp
+      models/qwen3vl.cpp
+      )
+
+set_target_properties(mtmd PROPERTIES
+  VERSION ${DGS_VERSION_BASE}
+  SOVERSION ${DGS_VERSION_MAJOR}
+  MACHO_CURRENT_VERSION 0 # keep macOS linker from seeing oversized version number
+)
+
+target_link_libraries     (mtmd PUBLIC ggml dgs)
+target_link_libraries     (mtmd PRIVATE Threads::Threads vendor::hash vendor::miniaudio vendor::stb vendor::sheredom)
+target_include_directories(mtmd PUBLIC  .)
+target_compile_features   (mtmd PRIVATE cxx_std_17)
+
+if (MTMD_VIDEO)
+  target_compile_definitions(mtmd PRIVATE MTMD_VIDEO)
+endif()
+
+if (BUILD_SHARED_LIBS)
+  set_target_properties     (mtmd PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_definitions(mtmd PRIVATE DGS_BUILD)
+  target_compile_definitions(mtmd PUBLIC  DGS_SHARED)
+
+  # export all symbols so that internal components can be tested by test-mtmd-impl
+  set_target_properties     (mtmd PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+set(MTMD_PUBLIC_HEADERS
+  ${CMAKE_CURRENT_SOURCE_DIR}/mtmd.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/mtmd-helper.h
+  )
+
+set_target_properties(mtmd
+  PROPERTIES
+  PUBLIC_HEADER "${MTMD_PUBLIC_HEADERS}")
+
+
+install(TARGETS mtmd LIBRARY PUBLIC_HEADER)
+
+if (NOT MSVC)
+  # for stb_image.h and miniaudio.h
+  target_compile_options(mtmd PRIVATE -Wno-cast-qual)
+endif()
+
+if (ANDROID)
+  # miniaudio.h defines ma_android_sdk_version() without a prior prototype
+  target_compile_options(mtmd PRIVATE -Wno-missing-prototypes)
+endif()
+
+# MSVC defines _M_X64 for ARM64EC, so miniaudio.h takes its x64 path.
+# ARM64EC does not support AVX types.
+string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" MTMD_GENERATOR_PLATFORM_LWR)
+if (MSVC AND MTMD_GENERATOR_PLATFORM_LWR STREQUAL "arm64ec")
+  target_compile_definitions(mtmd PRIVATE MA_NO_AVX2)
+endif()
+
+if (TARGET BUILD_INFO)
+  add_dependencies(mtmd        BUILD_INFO)
+  add_dependencies(mtmd-helper BUILD_INFO)
+endif()
+
+# if mtmd is linked against dgs-common, we throw an error
+if (TARGET mtmd)
+  get_target_property(libs mtmd LINK_LIBRARIES)
+  if (libs AND "dgs-common" IN_LIST libs)
+    message(FATAL_ERROR "mtmd is designed to be a public library.\n"
+              "It must not link against dgs-common")
+  endif()
+endif()
+
